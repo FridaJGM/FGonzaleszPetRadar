@@ -14,6 +14,18 @@ export type LostPetMatch = {
 const CACHE_KEY_LOST_PETS = 'lost_pets:active';
 const CACHE_TTL_SECONDS = 60;
 
+// Haversine formula — replaces ST_DWithin (PostGIS not available on Railway)
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 @Injectable()
 export class LostPetsService {
   private readonly logger = new Logger(LostPetsService.name);
@@ -37,14 +49,14 @@ export class LostPetsService {
       owner_name: dto.owner_name,
       owner_email: dto.owner_email,
       owner_phone: dto.owner_phone,
-      location: { type: 'Point', coordinates: [dto.lng, dto.lat] },
+      lat: dto.lat,
+      lng: dto.lng,
       address: dto.address,
       lost_date: new Date(dto.lost_date),
       is_active: dto.is_active ?? true,
     });
 
     const saved = await this.lostPetsRepo.save(entity);
-    // Invalidate cache on write
     await this.redis.del(CACHE_KEY_LOST_PETS);
     return saved;
   }
@@ -82,34 +94,13 @@ export class LostPetsService {
     lat: number;
     radiusMeters: number;
   }): Promise<LostPetMatch[]> {
-    const qb = this.lostPetsRepo
-      .createQueryBuilder('lost')
-      .where('lost.is_active = true')
-      .andWhere(
-        `ST_DWithin(
-          lost.location::geography,
-          ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
-          :radius
-        )`,
-      )
-      .addSelect(
-        `ST_Distance(
-          lost.location::geography,
-          ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-        )`,
-        'distance',
-      )
-      .setParameters({
-        lng: params.lng,
-        lat: params.lat,
-        radius: params.radiusMeters,
-      })
-      .orderBy('distance', 'ASC');
-
-    const { entities, raw } = await qb.getRawAndEntities();
-    return entities.map((pet, idx) => ({
-      pet,
-      distance_meters: Number(raw[idx]?.distance ?? NaN),
-    }));
+    const active = await this.findActive();
+    return active
+      .map((pet) => ({
+        pet,
+        distance_meters: haversineMeters(params.lat, params.lng, pet.lat, pet.lng),
+      }))
+      .filter((m) => m.distance_meters <= params.radiusMeters)
+      .sort((a, b) => a.distance_meters - b.distance_meters);
   }
 }

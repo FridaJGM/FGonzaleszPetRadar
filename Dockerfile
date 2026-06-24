@@ -23,26 +23,16 @@ FROM node:22-alpine AS production
 
 ENV NODE_ENV=production
 
-# Install postgresql-client for pg_isready / psql used in health checks
-RUN apk add --no-cache postgresql-client
-
 WORKDIR /app
 
-# Copy only what is needed to run
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 
-# Copy the PostGIS init script
-COPY scripts/init-postgis.sh ./scripts/init-postgis.sh
-RUN chmod +x ./scripts/init-postgis.sh
-
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown -R appuser:appgroup /app
 USER appuser
 
 EXPOSE 3000
 
-# Run PostGIS init then start the app
-CMD ["sh", "-c", "./scripts/init-postgis.sh && node dist/main"]
+CMD ["node", "dist/main"]

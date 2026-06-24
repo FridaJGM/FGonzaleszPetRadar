@@ -67,14 +67,11 @@ export class NotificationsService {
       this.config.get<string>('SMTP_USER') ??
       'no-reply@petradar.local';
 
-    const [lostLng, lostLat] = params.lostPet.location.coordinates;
-    const [foundLng, foundLat] = params.foundPet.location.coordinates;
-
     const mapUrl = this.buildMapboxStaticUrl({
-      lostLng,
-      lostLat,
-      foundLng,
-      foundLat,
+      lostLng: params.lostPet.lng,
+      lostLat: params.lostPet.lat,
+      foundLng: params.foundPet.lng,
+      foundLat: params.foundPet.lat,
     });
 
     const subject = `PetRadar: posible coincidencia (${params.lostPet.name}) a ${Math.round(
@@ -110,14 +107,7 @@ export class NotificationsService {
       }
     `;
 
-    await transporter.sendMail({
-      from,
-      to,
-      subject,
-      html,
-    });
-
+    await transporter.sendMail({ from, to, subject, html });
     return { sent: true };
   }
 }
-

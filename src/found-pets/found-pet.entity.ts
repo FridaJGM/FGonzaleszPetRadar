@@ -1,5 +1,4 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import type { Point } from 'geojson';
 
 @Entity({ name: 'found_pets' })
 export class FoundPet {
@@ -33,12 +32,11 @@ export class FoundPet {
   @Column({ type: 'varchar' })
   finder_phone!: string;
 
-  @Column({
-    type: 'geometry',
-    spatialFeatureType: 'Point',
-    srid: 4326,
-  })
-  location!: Point;
+  @Column({ type: 'float' })
+  lat!: number;
+
+  @Column({ type: 'float' })
+  lng!: number;
 
   @Column({ type: 'varchar' })
   address!: string;
@@ -52,4 +50,3 @@ export class FoundPet {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at!: Date;
 }
-

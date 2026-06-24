@@ -39,16 +39,15 @@ export class FoundPetsService {
         finder_name: dto.finder_name,
         finder_email: dto.finder_email,
         finder_phone: dto.finder_phone,
-        location: { type: 'Point', coordinates: [dto.lng, dto.lat] },
+        lat: dto.lat,
+        lng: dto.lng,
         address: dto.address,
         found_date: new Date(dto.found_date),
       }),
     );
 
-    // Invalidate cache on write
     await this.redis.del(CACHE_KEY_FOUND_PETS);
 
-    // Search lost pets within 500m radius using PostGIS ST_DWithin
     const matches = await this.lostPetsService.findActiveWithinRadius({
       lng: dto.lng,
       lat: dto.lat,
